@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  cassandra:
+    image: cassandra:latest
+    ports:
+      - "9042:9042"
+    restart: unless-stopped
+    environment:
+      - CASSANDRA_CLUSTER_NAME=local-cluster
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+  mongodb_data:
