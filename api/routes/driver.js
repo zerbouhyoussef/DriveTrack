@@ -7,9 +7,7 @@ module.exports = async function driverRoutes(fastify, opts) {
   const redis = fastify.redis
   const drivers = mongo.collection('drivers')
 
-  // ─────────────────────────────────────────────
-  // SCHEMAS
-  // ─────────────────────────────────────────────
+  // SCHEMAS 
 
   const driverBodySchema = {
     type: 'object',
@@ -50,10 +48,8 @@ module.exports = async function driverRoutes(fastify, opts) {
       count:  { type: 'number', default: 5 }
     }
   }
-
-  // ─────────────────────────────────────────────
+  
   // CRUD — MongoDB
-  // ─────────────────────────────────────────────
 
   // POST /drivers — Create driver
   fastify.post('/drivers', {
@@ -131,10 +127,8 @@ module.exports = async function driverRoutes(fastify, opts) {
     return { message: 'Driver deleted' }
   })
 
-  // ─────────────────────────────────────────────
   // GEO — Redis (go online / offline / update location / find nearby)
-  // ─────────────────────────────────────────────
-
+  
   // POST /drivers/:id/online — Driver goes online, sets location in Redis
   // Redis command: GEOADD drivers:locations <lng> <lat> <member>
   fastify.post('/drivers/:id/online', {
@@ -291,10 +285,8 @@ module.exports = async function driverRoutes(fastify, opts) {
     }
   })
 
-  // ─────────────────────────────────────────────
   // ANALYTICS — MongoDB Aggregation Pipelines
-  // ─────────────────────────────────────────────
-
+  
   // GET /drivers/analytics/by-city — Total drivers and avg rating per city
   fastify.get('/drivers/analytics/by-city', async (req, reply) => {
     const result = await drivers.aggregate([
