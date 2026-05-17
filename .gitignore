@@ -1,18 +1,28 @@
 # Dependencies
 node_modules/
-vendor/
 
-# Environment files
+# Build output
+dist/
+build/
+
+# Environment
 .env
 .env.local
-.env.*.local
+.env.production
 
-# IDE and editor files
+# IDE
 .vscode/
+.idea/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Logs
 *.log
-logs/
 npm-debug.log*
-package-lock.json
 
+# Docker volumes (local)
+mongodb_data/
+cassandra_data/

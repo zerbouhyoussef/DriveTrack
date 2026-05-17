@@ -5,84 +5,178 @@ A full-stack ride-sharing platform (inspired by inDrive/BlaBlaCar) with a highly
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────────────┐
-│  React UI   │────▶│  Fastify API │────▶│  Redis (Live State) │
-│  Dashboard  │     │              │────▶│  Cassandra (Events) │
-└─────────────┘     └──────────────┘────▶│  MongoDB (Analytics)│
-                                          └─────────────────────┘
+┌─────────────────┐         ┌──────────────┐         ┌──────────────────────┐
+│  Dashboard (80) │──nginx──▶│  API (3000)  │────────▶│  MongoDB (27017)     │
+│  React + Vite   │  /api/  │  Fastify     │────────▶│  Redis (6379)        │
+└─────────────────┘         └──────────────┘────────▶│  Cassandra (9042)    │
+                                                      └──────────────────────┘
 ```
 
 ### Database Roles
 
-| Database   | Purpose                          | Key Features                    |
-|-----------|----------------------------------|----------------------------------|
+| Database      | Purpose                          | Key Features                    |
+|--------------|----------------------------------|----------------------------------|
 | **Redis**     | Real-time state, geo, sessions   | GEORADIUS, Sorted Sets, TTL     |
 | **Cassandra** | Immutable trip event log         | Partition keys, append-only     |
 | **MongoDB**   | Driver profiles, aggregation     | $geoNear, $lookup, $facet       |
 
-## Tech Stack
+## Quick Start (Docker)
 
-- **Frontend**: React 19 + Vite + Tailwind CSS + Recharts + Lucide Icons
-- **Backend**: Fastify (Node.js)
-- **Databases**: MongoDB, Redis, Apache Cassandra
-- **Infrastructure**: Docker Compose
+### 1. Clone and run everything
 
-## Getting Started
+```bash
+docker-compose up --build
+```
 
-### Prerequisites
-- Node.js 18+
-- Docker & Docker Compose
+This starts all 5 services:
+- **MongoDB** on port 27017
+- **Redis** on port 6379 (password: admin)
+- **Cassandra** on port 9042
+- **API** on port 3000
+- **Dashboard** on port 80
+
+### 2. Seed the database (first time only)
+
+Wait ~60s for Cassandra to be ready, then:
+
+```bash
+docker-compose run seed
+```
+
+### 3. Open the dashboard
+
+Go to **http://localhost** in your browser.
+
+API is available at **http://localhost:3000** (or via **http://localhost/api/** through nginx).
+
+---
+
+## Environment Variables (.env)
+
+```env
+# MongoDB
+MONGO_URL=mongodb://mongo:27017
+MONGO_DB=drivetrack
+
+# Cassandra
+CASSANDRA_HOSTS=cassandra
+CASSANDRA_DC=datacenter1
+CASSANDRA_USER=admin
+CASSANDRA_PASSWORD=admin
+
+# Redis
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_PASSWORD=admin
+
+# API
+PORT=3000
+NODE_ENV=development
+```
+
+> For local development (without Docker), change hostnames to `localhost`.
+
+---
+
+## Local Development (without Docker)
 
 ### 1. Start databases
 ```bash
-docker-compose up -d
+docker-compose up mongo redis cassandra -d
 ```
 
-### 2. Start the API
+### 2. Update .env hostnames to localhost
+```env
+MONGO_URL=mongodb://localhost:27017
+CASSANDRA_HOSTS=localhost
+REDIS_HOST=localhost
+```
+
+### 3. Start the API
 ```bash
 cd api
 npm install
 npm start
 ```
 
-### 3. Start the Dashboard
+### 4. Start the Dashboard (dev mode with HMR)
 ```bash
 cd drivetrack-dashboard
 npm install
 npm run dev
 ```
 
-The dashboard will be available at `http://localhost:5173`
+Dashboard at `http://localhost:5173`, API at `http://localhost:3000`.
+
+---
+
+## Project Structure
+
+```
+DriveTrack/
+├── .env                          # Environment variables
+├── docker-compose.yaml           # Full stack orchestration
+├── api/
+│   ├── Dockerfile
+│   ├── app.js                    # Fastify entry point
+│   ├── seed.js                   # Database seeder
+│   ├── package.json
+│   ├── db/
+│   │   ├── mongo.js              # MongoDB plugin + indexes
+│   │   ├── redis.js              # Redis plugin + geo
+│   │   └── cassandra.js          # Cassandra plugin + schema
+│   └── routes/
+│       ├── driver.js             # CRUD + geo endpoints
+│       ├── trips.js              # Trip lifecycle
+│       └── analytics.js          # Cross-DB analytics
+└── drivetrack-dashboard/
+    ├── Dockerfile
+    ├── nginx.conf                # SPA routing + API proxy
+    ├── src/
+    │   ├── components/           # Reusable UI components
+    │   └── pages/                # Dashboard, Trips, Drivers, Analytics, LiveMap
+    └── package.json
+```
+
+---
 
 ## Dashboard Features
 
 - **Real-time Stats** — Live counters with animated transitions
 - **Revenue Charts** — Weekly performance with area/bar charts
 - **City Breakdown** — Performance comparison across cities
-- **Driver Leaderboard** — Top drivers ranked by daily trips
+- **Driver Leaderboard** — Top drivers ranked by daily trips (Redis ZREVRANGE)
 - **Live Activity Feed** — Real-time trip events
 - **Trip Management** — Search, filter, and inspect trips
 - **Driver Fleet** — Full driver profiles with status tracking
 - **Analytics** — Heatmaps, cancellation rates, distance buckets
-- **Live Map** — Simulated real-time driver positions (Redis GEORADIUS)
+- **Live Map** — Real-time driver positions (Redis GEORADIUS)
 - **Database Overview** — Architecture visualization
 
 ## API Endpoints
 
 ### Drivers
 - `POST /drivers` — Create driver
-- `GET /drivers` — List drivers
+- `GET /drivers` — List drivers (filter by city/status)
 - `POST /drivers/:id/online` — Go online (Redis GEOADD)
-- `GET /drivers/nearby` — Find nearby (Redis GEORADIUS)
+- `POST /drivers/:id/offline` — Go offline
+- `GET /drivers/nearby?lat=X&lng=Y` — Find nearby (Redis GEORADIUS)
 
 ### Trips
 - `POST /trips/request` — Request trip (assigns nearest driver)
 - `POST /trips/:id/start` — Start trip
-- `POST /trips/:id/complete` — Complete (writes to Cassandra)
-- `GET /trips?city=X&date=Y` — Query by partition key
+- `POST /trips/:id/complete` — Complete (writes to Cassandra + MongoDB)
+- `POST /trips/:id/cancel` — Cancel trip
+- `GET /trips?city=X&date=Y` — Query by partition key (Cassandra)
+- `GET /trips/active` — Active trips from Redis
 
 ### Analytics
-- `GET /analytics/redis/live-dashboard` — Live counters
+- `GET /analytics/redis/live-dashboard` — Live counters (Redis pipeline)
+- `GET /analytics/redis/leaderboard` — Top drivers (Redis sorted set)
 - `GET /analytics/cassandra/trips-by-city` — Partition queries
+- `GET /analytics/cassandra/multi-day` — Cross-partition aggregation
 - `GET /analytics/mongo/revenue-by-city` — Aggregation pipeline
+- `GET /analytics/mongo/top-drivers` — $lookup join
+- `GET /analytics/mongo/hourly-heatmap` — Date operators
 - `GET /analytics/report` — Cross-database combined report
+- `GET /health` — Health check

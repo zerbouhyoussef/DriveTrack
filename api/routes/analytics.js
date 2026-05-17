@@ -1,5 +1,7 @@
 'use strict'
 
+const { ObjectId } = require('mongodb')
+
 module.exports = async function analyticsRoutes(fastify, opts) {
   const mongo     = fastify.mongo.db('drivetrack')
   const redis     = fastify.redis
@@ -492,10 +494,12 @@ module.exports = async function analyticsRoutes(fastify, opts) {
       const driverId = raw[i].replace('driver:', '')
       const score    = parseInt(raw[i + 1])
 
-      const profile = await drivers.findOne(
-        { _id: driverId },
+      let objectId
+      try { objectId = new ObjectId(driverId) } catch { objectId = null }
+      const profile = objectId ? await drivers.findOne(
+        { _id: objectId },
         { projection: { name: 1, city: 1, rating: 1 } }
-      )
+      ) : null
 
       leaderboard.push({
         rank:       leaderboard.length + 1,

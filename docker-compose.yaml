@@ -1,27 +1,120 @@
-version: '3.8'
-
 services:
+  # ─── DATABASES ───────────────────────────────────────────────
+
+  mongo:
+    image: mongo:7
+    container_name: drivetrack-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   redis:
-    image: redis:latest
+    image: redis:7-alpine
+    container_name: drivetrack-redis
     ports:
       - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-admin}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-admin}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   cassandra:
-    image: cassandra:latest
+    image: cassandra:4.1
+    container_name: drivetrack-cassandra
     ports:
       - "9042:9042"
-    restart: unless-stopped
     environment:
-      - CASSANDRA_CLUSTER_NAME=local-cluster
-
-  mongodb:
-    image: mongo:latest
-    ports:
-      - "27017:27017"
-    restart: unless-stopped
+      - CASSANDRA_CLUSTER_NAME=drivetrack-cluster
+      - CASSANDRA_DC=${CASSANDRA_DC:-datacenter1}
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
     volumes:
-      - mongodb_data:/data/db
+      - cassandra_data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe cluster' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  # ─── BACKEND API ────────────────────────────────────────────
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: drivetrack-api
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - MONGO_DB=drivetrack
+      - CASSANDRA_HOSTS=cassandra
+      - CASSANDRA_DC=${CASSANDRA_DC:-datacenter1}
+      - CASSANDRA_USER=${CASSANDRA_USER:-admin}
+      - CASSANDRA_PASSWORD=${CASSANDRA_PASSWORD:-admin}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-admin}
+      - PORT=3000
+      - NODE_ENV=${NODE_ENV:-development}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      cassandra:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── FRONTEND DASHBOARD ────────────────────────────────────
+
+  dashboard:
+    build:
+      context: ./drivetrack-dashboard
+      dockerfile: Dockerfile
+    container_name: drivetrack-dashboard
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # ─── SEED DATA (runs once) ─────────────────────────────────
+
+  seed:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: drivetrack-seed
+    command: node /app/seed.js
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - MONGO_DB=drivetrack
+      - CASSANDRA_HOSTS=cassandra
+      - CASSANDRA_DC=${CASSANDRA_DC:-datacenter1}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-admin}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      cassandra:
+        condition: service_healthy
+    restart: "no"
 
 volumes:
   mongodb_data:
+  cassandra_data:

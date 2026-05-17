@@ -55,61 +55,23 @@ async function mongoPlugin(fastify, opts) {
   const drivers = db.collection('drivers')
   const trips   = db.collection('trips')
 
-  //  Index creation 
+  //  Index creation
   // createIndex is idempotent — safe to call on every startup
+  // No custom names: lets MongoDB use auto-generated names so startup is
+  // always idempotent regardless of whether the seed already ran first.
   fastify.log.info('[MongoDB] Creating indexes...')
 
   // drivers collection
-  await drivers.createIndex(
-    { location: '2dsphere' },
-    { name: 'idx_drivers_location_geo', sparse: true }
-  )
-  // 2dsphere index required for $geoNear and $geoWithin queries
-  // sparse: true — only index docs that have a location field
-
-  await drivers.createIndex(
-    { city: 1 },
-    { name: 'idx_drivers_city' }
-  )
-  // Speeds up: db.drivers.find({ city: 'Sevilla' })
-
-  await drivers.createIndex(
-    { status: 1, city: 1 },
-    { name: 'idx_drivers_status_city' }
-  )
-  // Compound index for: find({ status: 'online', city: 'Sevilla' })
-  // Order matters: equality filter (status) before range/sort (city)
-
-  await drivers.createIndex(
-    { rating: -1 },
-    { name: 'idx_drivers_rating_desc' }
-  )
-  // Speeds up top-rated driver queries and sort operations
+  await drivers.createIndex({ location: '2dsphere' }, { sparse: true })
+  await drivers.createIndex({ city: 1 })
+  await drivers.createIndex({ status: 1, city: 1 })
+  await drivers.createIndex({ rating: -1 })
 
   // trips collection
-  await trips.createIndex(
-    { city: 1, created_at: -1 },
-    { name: 'idx_trips_city_date' }
-  )
-  // Compound index for analytics queries filtered by city + sorted by date
-
-  await trips.createIndex(
-    { driver_id: 1, created_at: -1 },
-    { name: 'idx_trips_driver_date' }
-  )
-  // Driver history queries: find({ driver_id: X }).sort({ created_at: -1 })
-
-  await trips.createIndex(
-    { status: 1 },
-    { name: 'idx_trips_status' }
-  )
-  // Speeds up: db.trips.aggregate([{ $match: { status: 'completed' } }])
-
-  await trips.createIndex(
-    { created_at: -1 },
-    { name: 'idx_trips_created_at_desc' }
-  )
-  // For time-range analytics across all cities
+  await trips.createIndex({ city: 1, created_at: -1 })
+  await trips.createIndex({ driver_id: 1, created_at: -1 })
+  await trips.createIndex({ status: 1 })
+  await trips.createIndex({ created_at: -1 })
 
   fastify.log.info('[MongoDB] All indexes ready')
 

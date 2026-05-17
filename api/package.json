@@ -1,0 +1,20 @@
+{
+  "name": "drivetrack-api",
+  "version": "1.0.0",
+  "description": "DriveTrack ride-sharing API — Fastify + MongoDB + Redis + Cassandra",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js"
+  },
+  "dependencies": {
+    "cassandra-driver": "^4.7.2",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "fastify-plugin": "^4.5.1",
+    "ioredis": "^5.4.1",
+    "mongodb": "^6.8.0",
+    "uuid": "^10.0.0",
+    "@fastify/cors": "^9.0.1"
+  }
+}
