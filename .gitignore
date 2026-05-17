@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE and editor files
+.vscode/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
