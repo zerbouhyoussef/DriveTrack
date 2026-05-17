@@ -1,1 +1,88 @@
-.
+# DriveTrack — Ride-Sharing Platform
+
+A full-stack ride-sharing platform (inspired by inDrive/BlaBlaCar) with a highly interactive dashboard, built with a polyglot persistence architecture using MongoDB, Redis, and Cassandra.
+
+## Architecture
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────────────┐
+│  React UI   │────▶│  Fastify API │────▶│  Redis (Live State) │
+│  Dashboard  │     │              │────▶│  Cassandra (Events) │
+└─────────────┘     └──────────────┘────▶│  MongoDB (Analytics)│
+                                          └─────────────────────┘
+```
+
+### Database Roles
+
+| Database   | Purpose                          | Key Features                    |
+|-----------|----------------------------------|----------------------------------|
+| **Redis**     | Real-time state, geo, sessions   | GEORADIUS, Sorted Sets, TTL     |
+| **Cassandra** | Immutable trip event log         | Partition keys, append-only     |
+| **MongoDB**   | Driver profiles, aggregation     | $geoNear, $lookup, $facet       |
+
+## Tech Stack
+
+- **Frontend**: React 19 + Vite + Tailwind CSS + Recharts + Lucide Icons
+- **Backend**: Fastify (Node.js)
+- **Databases**: MongoDB, Redis, Apache Cassandra
+- **Infrastructure**: Docker Compose
+
+## Getting Started
+
+### Prerequisites
+- Node.js 18+
+- Docker & Docker Compose
+
+### 1. Start databases
+```bash
+docker-compose up -d
+```
+
+### 2. Start the API
+```bash
+cd api
+npm install
+npm start
+```
+
+### 3. Start the Dashboard
+```bash
+cd drivetrack-dashboard
+npm install
+npm run dev
+```
+
+The dashboard will be available at `http://localhost:5173`
+
+## Dashboard Features
+
+- **Real-time Stats** — Live counters with animated transitions
+- **Revenue Charts** — Weekly performance with area/bar charts
+- **City Breakdown** — Performance comparison across cities
+- **Driver Leaderboard** — Top drivers ranked by daily trips
+- **Live Activity Feed** — Real-time trip events
+- **Trip Management** — Search, filter, and inspect trips
+- **Driver Fleet** — Full driver profiles with status tracking
+- **Analytics** — Heatmaps, cancellation rates, distance buckets
+- **Live Map** — Simulated real-time driver positions (Redis GEORADIUS)
+- **Database Overview** — Architecture visualization
+
+## API Endpoints
+
+### Drivers
+- `POST /drivers` — Create driver
+- `GET /drivers` — List drivers
+- `POST /drivers/:id/online` — Go online (Redis GEOADD)
+- `GET /drivers/nearby` — Find nearby (Redis GEORADIUS)
+
+### Trips
+- `POST /trips/request` — Request trip (assigns nearest driver)
+- `POST /trips/:id/start` — Start trip
+- `POST /trips/:id/complete` — Complete (writes to Cassandra)
+- `GET /trips?city=X&date=Y` — Query by partition key
+
+### Analytics
+- `GET /analytics/redis/live-dashboard` — Live counters
+- `GET /analytics/cassandra/trips-by-city` — Partition queries
+- `GET /analytics/mongo/revenue-by-city` — Aggregation pipeline
+- `GET /analytics/report` — Cross-database combined report
