@@ -1,7 +1,3 @@
-// db/redis.js — Redis connection plugin
-// Registers ioredis client as fastify.redis
-// Covers: connection, retry strategy, health check, graceful shutdown
-
 'use strict'
 
 const fp    = require('fastify-plugin')
@@ -40,7 +36,7 @@ async function redisPlugin(fastify, opts) {
     lazyConnect:         false   // connect immediately on startup
   })
 
-  // ── Event listeners ──────────────────────────────────────
+  //  Event listeners 
   client.on('connect',       ()    => fastify.log.info('[Redis] Connected'))
   client.on('ready',         ()    => fastify.log.info('[Redis] Ready to accept commands'))
   client.on('error',         (err) => fastify.log.error(`[Redis] Error: ${err.message}`))
@@ -48,8 +44,7 @@ async function redisPlugin(fastify, opts) {
   client.on('reconnecting',  (ms)  => fastify.log.warn(`[Redis] Reconnecting in ${ms}ms`))
   client.on('end',           ()    => fastify.log.warn('[Redis] Connection ended'))
 
-  // ── Health check ─────────────────────────────────────────
-  // PING command — confirms Redis is alive and responding
+  //  Health check 
   try {
     const pong = await client.ping()
     if (pong !== 'PONG') throw new Error('Unexpected PING response')
@@ -59,8 +54,7 @@ async function redisPlugin(fastify, opts) {
     throw err // crash fast on startup if Redis is unavailable
   }
 
-  // ── Ensure required indexes / structures exist ────────────
-  // Leaderboard sorted set TTL (set if not already present)
+  //  Ensure required indexes
   const leaderboardExists = await client.exists('leaderboard:drivers:today')
   if (!leaderboardExists) {
     // Initialize empty sorted set with 24h TTL
@@ -69,11 +63,11 @@ async function redisPlugin(fastify, opts) {
     fastify.log.info('[Redis] Leaderboard key initialized')
   }
 
-  // ── Decorate Fastify ──────────────────────────────────────
+  //  Decorate Fastify 
   // Accessible as fastify.redis in all routes
   fastify.decorate('redis', client)
 
-  // ── Graceful shutdown ─────────────────────────────────────
+  //  Graceful shutdown ─
   fastify.addHook('onClose', async (instance) => {
     fastify.log.info('[Redis] Closing connection...')
     await client.quit()  // QUIT command — clean disconnect
